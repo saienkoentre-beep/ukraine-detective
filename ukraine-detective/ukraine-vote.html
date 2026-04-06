@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Детектив · Голосування</title>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0F172A;color:#F8FAFC;min-height:100vh;display:flex;flex-direction:column}
+.top{background:#1E293B;padding:10px 16px;display:flex;align-items:center;border-bottom:1px solid #334155;flex-shrink:0}
+.top-title{font-size:13px;font-weight:600;color:#94A3B8}
+.top-session{margin-left:auto;font-size:11px;background:#334155;padding:3px 10px;border-radius:20px;color:#94A3B8}
+.main{flex:1;padding:16px;display:flex;flex-direction:column;gap:14px}
+
+.waiting{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:16px;text-align:center;padding:32px;min-height:60vh}
+.pulse{width:64px;height:64px;border-radius:50%;background:#1D9E75;display:flex;align-items:center;justify-content:center;font-size:28px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(29,158,117,.4)}50%{box-shadow:0 0 0 16px rgba(29,158,117,0)}}
+
+.q-card{background:#1E293B;border:1px solid #334155;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.dim-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.pdv{background:#1D3A5F;color:#7DD3FC}
+.ind{background:#1D4534;color:#6EE7B7}
+.mas{background:#4A2A0A;color:#FCD34D}
+.uai{background:#3D1515;color:#FCA5A5}
+.situation-text{font-size:15px;line-height:1.6;color:#F8FAFC;background:#0F172A;padding:14px;border-radius:10px;border-left:3px solid #334155}
+.scale-question{font-size:13px;color:#94A3B8;text-align:center;font-style:italic}
+.scale-wrap{display:flex;flex-direction:column;gap:10px}
+.scale-labels{display:flex;justify-content:space-between;font-size:11px;color:#475569;padding:0 2px}
+.scale-btns{display:flex;gap:8px}
+.scale-btn{flex:1;aspect-ratio:1;border-radius:12px;border:2px solid #334155;background:#0F172A;color:#F8FAFC;font-size:18px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.scale-btn:active{transform:scale(.92)}
+.scale-btn.s1{border-color:#475569}
+.scale-btn.s2{border-color:#64748B}
+.scale-btn.s3{border-color:#94A3B8}
+.scale-btn.s4{border-color:#F59E0B}
+.scale-btn.s5{border-color:#E24B4A}
+.scale-btn.selected.s1{background:#475569;border-color:#475569}
+.scale-btn.selected.s2{background:#64748B;border-color:#64748B}
+.scale-btn.selected.s3{background:#94A3B8;border-color:#94A3B8;color:#0F172A}
+.scale-btn.selected.s4{background:#F59E0B;border-color:#F59E0B;color:#0F172A}
+.scale-btn.selected.s5{background:#E24B4A;border-color:#E24B4A}
+.scale-btn.disabled{opacity:.4;pointer-events:none}
+.voted-box{background:#0D3D2E;border:1.5px solid #1D9E75;border-radius:14px;padding:16px;text-align:center;color:#6EE7B7;font-size:15px;font-weight:500}
+.voted-sub{font-size:13px;color:#059669;margin-top:5px}
+.q-progress{font-size:12px;color:#475569;text-align:center}
+.your-vote{background:#1E293B;border:1px solid #334155;border-radius:10px;padding:10px;text-align:center;font-size:13px;color:#94A3B8}
+.your-vote strong{color:#F8FAFC;font-size:18px;display:block;margin-top:4px}
+
+.results-wrap{padding:4px;display:flex;flex-direction:column;gap:12px}
+.r-title{font-size:20px;font-weight:700;text-align:center;margin-top:8px}
+.r-sub{font-size:13px;color:#64748B;text-align:center}
+.r-dim{background:#1E293B;border:1px solid #334155;border-radius:12px;padding:14px}
+.r-dim-name{font-size:11px;font-weight:600;text-transform:uppercase;color:#64748B;margin-bottom:6px}
+.r-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.r-bar-label{font-size:11px;color:#94A3B8;width:70px;flex-shrink:0}
+.r-bar-track{flex:1;height:8px;background:#0F172A;border-radius:4px;overflow:hidden}
+.r-bar-fill{height:100%;border-radius:4px;transition:width 1s ease}
+.r-bar-val{font-size:11px;font-weight:700;min-width:28px;text-align:right}
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="top-title">🇺🇦 Культурний детектив</span>
+  <span class="top-session" id="session-lbl">—</span>
+</div>
+<div id="app" class="main">
+  <div class="waiting">
+    <div class="pulse">🔍</div>
+    <div>
+      <div style="font-size:18px;font-weight:600;margin-bottom:8px">Очікуємо початку</div>
+      <div style="font-size:14px;color:#94A3B8">Викладач розпочне — ситуація з'явиться автоматично</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  databaseURL: "https://hofstede-75bd5-default-rtdb.europe-west1.firebasedatabase.app"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const SITUATIONS=[
+  {dim:"pdv",dimLabel:"Дистанція влади",color:"pdv",text:"Підлеглий не погоджується з рішенням керівника, але нічого не каже вголос — просто виконує наказ."},
+  {dim:"pdv",dimLabel:"Дистанція влади",color:"pdv",text:"Директор компанії приїжджає на корпоратив на дорогому авто, займає окремий стіл — і всі вважають це нормальним."},
+  {dim:"pdv",dimLabel:"Дистанція влади",color:"pdv",text:"Рядовий співробітник вирішує важливе питання лише після отримання дозволу «зверху», навіть якщо рішення очевидне."},
+  {dim:"pdv",dimLabel:"Дистанція влади",color:"pdv",text:"Команда волонтерів самоорганізовується без керівника і ефективно вирішує складні логістичні завдання."},
+  {dim:"ind",dimLabel:"Індивідуалізм / Колективізм",color:"ind",text:"На роботу беруть 'свого' — родича або знайомого — навіть якщо є кращий кандидат зі сторони."},
+  {dim:"ind",dimLabel:"Індивідуалізм / Колективізм",color:"ind",text:"Колеги збираються після роботи 'своїм колом', нового члена команди довго не приймають як 'свого'."},
+  {dim:"ind",dimLabel:"Індивідуалізм / Колективізм",color:"ind",text:"Молодий спеціаліст готовий змінити компанію заради вищої зарплати, не відчуваючи себе зрадником колективу."},
+  {dim:"ind",dimLabel:"Індивідуалізм / Колективізм",color:"ind",text:"Вирішуючи ділове питання, українець спочатку дізнається 'хто за ким стоїть' — особисті зв'язки важливіші за формальні процедури."},
+  {dim:"mas",dimLabel:"Маскулінність / Фемінінність",color:"mas",text:"На важливій нараді жінка-керівник отримує менше уваги ніж чоловік на аналогічній посаді."},
+  {dim:"mas",dimLabel:"Маскулінність / Фемінінність",color:"mas",text:"Молодий менеджер відмовляється від підвищення бо не хоче більше відповідальності і стресу — цінує спокій."},
+  {dim:"mas",dimLabel:"Маскулінність / Фемінінність",color:"mas",text:"Успішний бізнесмен демонструє дорогий годинник, авто, відпочинок за кордоном — статус важливий."},
+  {dim:"mas",dimLabel:"Маскулінність / Фемінінність",color:"mas",text:"Компанія дає працівникам додатковий вихідний після інтенсивного проєкту — 'ви заслужили відпочинок'."},
+  {dim:"uai",dimLabel:"Уникнення невизначеності",color:"uai",text:"Перш ніж почати новий проєкт, команда вимагає детального плану, чітких інструкцій і письмового погодження."},
+  {dim:"uai",dimLabel:"Уникнення невизначеності",color:"uai",text:"Іноземний партнер пропонує укласти угоду 'на довірі' без детального договору — українська сторона відчуває дискомфорт."},
+  {dim:"uai",dimLabel:"Уникнення невизначеності",color:"uai",text:"Українські підприємці легко починають бізнес без бізнес-плану — 'розберемося по ходу, головне — почати'."},
+  {dim:"uai",dimLabel:"Уникнення невизначеності",color:"uai",text:"Зміна законодавства чи нові правила гри у бізнесі викликають стрес і тривогу навіть якщо зміни позитивні."},
+];
+
+const DIM_META={
+  pdv:{label:"Дистанція влади",lo:"Мала",hi:"Велика",color:"#378ADD"},
+  ind:{label:"Індивідуалізм",lo:"Колективізм",hi:"Індивідуалізм",color:"#1D9E75"},
+  mas:{label:"Маскулінність",lo:"Фемінінність",hi:"Маскулінність",color:"#EF9F27"},
+  uai:{label:"Уникн. невизначеності",lo:"Слабке",hi:"Сильне",color:"#E24B4A"},
+};
+const OFFICIAL={pdv:92,ind:25,mas:27,uai:95};
+
+const params=new URLSearchParams(location.search);
+const SESSION=params.get("s")||"default";
+const STUDENT_ID="st_"+Math.random().toString(36).slice(2,9);
+document.getElementById("session-lbl").textContent="сесія: "+SESSION;
+
+const sessionRef=db.ref("detective/"+SESSION);
+const voted={};
+let currentPhase="waiting", currentQIdx=-1;
+
+db.ref("detective/"+SESSION+"/connected/"+STUDENT_ID).set(true);
+db.ref("detective/"+SESSION+"/connected/"+STUDENT_ID).onDisconnect().remove();
+
+function showWaiting(){
+  document.getElementById("app").innerHTML=`
+    <div class="waiting">
+      <div class="pulse">🔍</div>
+      <div>
+        <div style="font-size:18px;font-weight:600;margin-bottom:8px">Очікуємо початку</div>
+        <div style="font-size:14px;color:#94A3B8">Викладач розпочне — ситуація з'явиться автоматично</div>
+      </div>
+    </div>`;
+}
+
+function showSituation(qIdx){
+  const s=SITUATIONS[qIdx];
+  const myVote=voted[qIdx];
+  const hasVoted=myVote!==undefined;
+
+  document.getElementById("app").innerHTML=`
+    <div class="q-card">
+      <div><span class="dim-pill ${s.color}">${s.dimLabel}</span></div>
+      <div class="situation-text">${s.text}</div>
+      <div class="scale-question">Наскільки типова ця ситуація для України?</div>
+      <div class="scale-wrap">
+        <div class="scale-btns">
+          ${[1,2,3,4,5].map(i=>`
+            <button class="scale-btn s${i} ${hasVoted&&myVote===i?'selected':''} ${hasVoted?'disabled':''}"
+              onclick="vote(${qIdx},${i})">${i}</button>`).join("")}
+        </div>
+        <div class="scale-labels">
+          <span>зовсім не типово</span>
+          <span>дуже типово</span>
+        </div>
+      </div>
+      ${hasVoted?`
+        <div class="your-vote">Ваша оцінка<strong>${myVote} / 5</strong></div>
+        <div class="voted-box">✓ Оцінку прийнято<div class="voted-sub">Чекайте наступної ситуації</div></div>`:""}
+    </div>
+    <div class="q-progress">Ситуація ${qIdx+1} з ${SITUATIONS.length}</div>`;
+}
+
+async function vote(qIdx, val){
+  if(voted[qIdx]!==undefined) return;
+  voted[qIdx]=val;
+  await db.ref("detective/"+SESSION+"/votes/q"+qIdx+"/"+STUDENT_ID).set(val);
+  showSituation(qIdx);
+}
+
+function showResults(){
+  // Розраховуємо особистий профіль
+  const DIRECTION=[1,1,1,-1, -1,-1,1,-1, -1,1,-1,1, 1,1,-1,1];
+  const ds={pdv:{s:0,c:0},ind:{s:0,c:0},mas:{s:0,c:0},uai:{s:0,c:0}};
+  Object.entries(voted).forEach(([qi,val])=>{
+    const idx=parseInt(qi);
+    const s=SITUATIONS[idx];
+    const dir=DIRECTION[idx];
+    const norm=dir===1?val:(6-val);
+    ds[s.dim].s+=norm;
+    ds[s.dim].c++;
+  });
+
+  const dimCards=Object.entries(DIM_META).map(([k,d])=>{
+    const sc=ds[k];
+    const myScore=sc.c>0?Math.round((sc.s/sc.c-1)/4*100):50;
+    const official=OFFICIAL[k];
+    return `<div class="r-dim">
+      <div class="r-dim-name">${d.label}</div>
+      <div class="r-bar-row">
+        <span class="r-bar-label" style="color:#94A3B8">Моя оцінка</span>
+        <div class="r-bar-track"><div class="r-bar-fill" style="width:${myScore}%;background:${d.color}"></div></div>
+        <span class="r-bar-val" style="color:${d.color}">${myScore}</span>
+      </div>
+      <div class="r-bar-row">
+        <span class="r-bar-label" style="color:#F59E0B">Хофстеде</span>
+        <div class="r-bar-track"><div class="r-bar-fill" style="width:${official}%;background:#F59E0B"></div></div>
+        <span class="r-bar-val" style="color:#F59E0B">${official}</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  document.getElementById("app").innerHTML=`
+    <div class="results-wrap">
+      <div style="font-size:32px;text-align:center">🇺🇦</div>
+      <div class="r-title">Ваша оцінка України</div>
+      <div class="r-sub">Порівняння з офіційними індексами Хофстеде</div>
+      ${dimCards}
+      <div style="font-size:12px;color:#475569;text-align:center;padding:8px">Подивіться на загальний профіль групи на головному екрані</div>
+    </div>`;
+}
+
+sessionRef.on("value",snap=>{
+  const data=snap.val();
+  if(!data) return;
+  const newPhase=data.phase||"waiting";
+  const newQIdx=data.currentQ||0;
+
+  if(newPhase==="results"){
+    if(currentPhase!=="results"){currentPhase="results";showResults();}
+    return;
+  }
+  if(newPhase==="waiting"){
+    if(currentPhase!=="waiting"){currentPhase="waiting";currentQIdx=-1;showWaiting();}
+    return;
+  }
+  if(newPhase==="voting"){
+    if(currentPhase!=="voting"||newQIdx!==currentQIdx){
+      currentPhase="voting";currentQIdx=newQIdx;showSituation(newQIdx);
+    }
+  }
+});
+</script>
+</body>
+</html>
